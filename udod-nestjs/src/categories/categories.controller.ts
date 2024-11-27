@@ -3,6 +3,17 @@ import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { Category } from '../entities/category.entity';
+import { 
+  KeycloakConnectModule,
+  ResourceGuard,
+  RoleGuard,
+  AuthGuard,
+  Resource,
+  Roles,
+  Public,
+  Unprotected
+} from 'nest-keycloak-connect';
+import { APP_GUARD } from '@nestjs/core';
 
 @ApiTags('categories')
 @Controller('categories')
@@ -12,6 +23,7 @@ export class CategoriesController {
   @Post()
   @ApiOperation({ summary: 'Create category' })
   @ApiResponse({ status: 201, type: Category })
+  @Roles({ roles: ['app-admin', 'categories-admin'] })
   create(@Body() createCategoryDto: CreateCategoryDto): Promise<Category> {
     return this.categoriesService.create(createCategoryDto);
   }
@@ -19,6 +31,7 @@ export class CategoriesController {
   @Get()
   @ApiOperation({ summary: 'Get all categories' })
   @ApiResponse({ status: 200, type: [Category] })
+  @Roles({ roles: ['app-admin', 'categories-cli'] })
   findAll(): Promise<Category[]> {
     return this.categoriesService.findAll();
   }
@@ -26,6 +39,7 @@ export class CategoriesController {
   @Get(':id')
   @ApiOperation({ summary: 'Get category by id' })
   @ApiResponse({ status: 200, type: Category })
+  @Roles({ roles: ['app-admin', 'categories-cli'] })
   findOne(@Param('id') id: number): Promise<Category> {
     return this.categoriesService.findOne(id);
   }
@@ -33,6 +47,7 @@ export class CategoriesController {
   @Put(':id')
   @ApiOperation({ summary: 'Update category' })
   @ApiResponse({ status: 200, type: Category })
+  @Roles({ roles: ['app-admin', 'categories-admin'] })
   update(
     @Param('id') id: number,
     @Body() updateCategoryDto: CreateCategoryDto,
@@ -43,7 +58,16 @@ export class CategoriesController {
   @Delete(':id')
   @ApiOperation({ summary: 'Delete category' })
   @ApiResponse({ status: 200, description: 'Category deleted' })
-  remove(@Param('id') id: number): Promise<void> {
-    return this.categoriesService.remove(id);
-  }
+  @ApiResponse({ 
+      status: 500, 
+      description: 'Internal server error',
+      schema: {
+          type: 'object',
+          properties: {
+              statusCode: { type: 'number', example: 500 },
+              message: { type: 'string', example: 'Error deleting category' },
+              error: { type: 'string', example: 'Internal Server Error' }
+          }
+      }
+  })
 }

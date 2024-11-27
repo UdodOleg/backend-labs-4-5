@@ -5,11 +5,24 @@ import { CategoriesModule } from './categories/categories.module';
 import { ProductsModule } from './products/products.module';
 import { Category } from './entities/category.entity';
 import { Product } from './entities/product.entity';
+import {
+  KeycloakConnectModule,
+  ResourceGuard,
+  RoleGuard,
+  AuthGuard,
+} from 'nest-keycloak-connect';
+import { APP_GUARD } from '@nestjs/core';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       envFilePath: 'db.env',
+    }),
+    KeycloakConnectModule.register({
+      authServerUrl: 'http://localhost:7080', 
+      realm: 'udod-realm',
+      clientId: 'nest-app',
+      secret: 'IcxAEBhQQXCzihWyfLE4A83PVPANCNcg', 
     }),
     TypeOrmModule.forRoot({
       type: 'postgres',
@@ -18,12 +31,29 @@ import { Product } from './entities/product.entity';
       username: 'postgres',
       password: '12345',
       database: 'projectdb',
-      entities: [Category, Product], // явно вказуємо наші entity
+      entities: [Category, Product],
       autoLoadEntities: true,
       synchronize: true,
     }),
-    CategoriesModule, // підключаємо модуль категорій
-    ProductsModule,   // підключаємо модуль продуктів
+    CategoriesModule,
+    ProductsModule,
+  ],
+  providers: [
+    // Global Authentication Guard
+    {
+      provide: APP_GUARD,
+      useClass: AuthGuard,
+    },
+    // Global Resource Guard
+    {
+      provide: APP_GUARD,
+      useClass: ResourceGuard,
+    },
+    // Global Role Guard
+    {
+      provide: APP_GUARD,
+      useClass: RoleGuard,
+    },
   ],
 })
 export class AppModule {}
