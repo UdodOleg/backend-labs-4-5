@@ -58,16 +58,8 @@ export class CategoriesController {
   @Delete(':id')
   @ApiOperation({ summary: 'Delete category' })
   @ApiResponse({ status: 200, description: 'Category deleted' })
-  @ApiResponse({ 
-      status: 500, 
-      description: 'Internal server error',
-      schema: {
-          type: 'object',
-          properties: {
-              statusCode: { type: 'number', example: 500 },
-              message: { type: 'string', example: 'Error deleting category' },
-              error: { type: 'string', example: 'Internal Server Error' }
-          }
-      }
-  })
-}
+  @Roles({ roles: ['app-admin', 'categories-admin'] })
+  remove(@Param('id') id: number): Promise<void> {
+    return this.categoriesService.remove(id);
+  }
+} 
