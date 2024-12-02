@@ -14,11 +14,10 @@ return [
     */
 
     'defaults' => [
-        'defaults' => [
-            'guard' => 'api',
-            'passwords' => 'users',
-        ],
+        'guard' => 'web',
+        'passwords' => 'users',
     ],
+
     /*
     |--------------------------------------------------------------------------
     | Authentication Guards
@@ -41,29 +40,11 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
-        'api' => [
+        'keycloak' => [
             'driver' => 'keycloak',
             'provider' => 'users',
         ],
     ],
-
-    'providers' => [
-        'users' => [
-            'driver' => 'eloquent',
-            'model' => App\Models\User::class,
-        ],
-    ],
-
-    'passwords' => [
-        'users' => [
-            'provider' => 'users',
-            'table' => 'password_resets',
-            'expire' => 60,
-            'throttle' => 60,
-        ],
-    ],
-
-    'password_timeout' => 10800,
 
     /*
     |--------------------------------------------------------------------------
@@ -81,6 +62,18 @@ return [
     | Supported: "database", "eloquent"
     |
     */
+
+    'providers' => [
+        'users' => [
+            'driver' => 'eloquent',
+            'model' => App\Models\User::class,
+        ],
+
+        // 'users' => [
+        //     'driver' => 'database',
+        //     'table' => 'users',
+        // ],
+    ],
 
     /*
     |--------------------------------------------------------------------------
@@ -101,6 +94,15 @@ return [
     |
     */
 
+    'passwords' => [
+        'users' => [
+            'provider' => 'users',
+            'table' => env('AUTH_PASSWORD_RESET_TOKEN_TABLE', 'password_reset_tokens'),
+            'expire' => 60,
+            'throttle' => 60,
+        ],
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Password Confirmation Timeout
@@ -112,5 +114,6 @@ return [
     |
     */
 
+    'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
 ];

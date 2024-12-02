@@ -59,10 +59,7 @@ return [
         // App\Providers\AuthServiceProvider::class,
         // App\Providers\EventServiceProvider::class,
         App\Providers\RouteServiceProvider::class,
-
-        Illuminate\Auth\AuthServiceProvider::class,
-        App\Providers\AuthServiceProvider::class,
-        KeycloakGuard\KeycloakGuardServiceProvider::class,
+        App\Providers\KeycloakServiceProvider::class,
     ],
 
     /*

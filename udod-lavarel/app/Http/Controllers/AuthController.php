@@ -1,152 +1,103 @@
 <?php
 
-namespace App\Http\Controllers\Auth;
+namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Exception;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class AuthController extends Controller
 {
-    /**
-     * Get the authenticated user's details
-     */
-    public function user(Request $request)
+    protected $keycloakUrl;
+    protected $realm;
+    protected $clientId;
+    protected $clientSecret;
+
+    public function __construct()
     {
-        try {
-            $user = Auth::user();
-            $token = Auth::token();
-            
-            return response()->json([
-                'user' => $user,
-                'token' => $token,
-                'decoded_token' => Auth::decodedToken()
-            ]);
-        } catch (Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 401);
-        }
+        $this->keycloakUrl = rtrim(env('KEYCLOAK_BASE_URL', 'http://localhost:7080'), '/');
+        $this->realm = env('KEYCLOAK_REALM', 'udod-lavarel-realm');
+        $this->clientId = env('KEYCLOAK_CLIENT_ID', 'lavarel-cli');
+        $this->clientSecret = env('KEYCLOAK_CLIENT_SECRET', '');
     }
 
-    /**
-     * Test endpoint to verify token
-     */
-    public function test(Request $request)
+    public function login(Request $request)
     {
         try {
-            return response()->json([
-                'token' => Auth::token(),
-                'message' => 'Token is valid',
-                'user' => Auth::user()
+            // Validate all required fields for the form
+            $credentials = $request->validate([
+                'grant_type' => 'required|string',
+                'client_id' => 'required|string',
+                'client_secret' => 'required|string',
+                'username' => 'required|string',
+                'password' => 'required|string'
             ]);
-        } catch (Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 401);
-        }
-    }
 
-    /**
-     * Get user roles from token
-     */
-    public function roles(Request $request)
-    {
-        try {
-            $token = Auth::decodedToken();
-            $roles = $token['resource_access'] ?? [];
-            
-            return response()->json([
-                'roles' => $roles,
-                'realm_roles' => $token['realm_access']['roles'] ?? []
-            ]);
-        } catch (Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 401);
-        }
-    }
+            $tokenUrl = "{$this->keycloakUrl}/realms/{$this->realm}/protocol/openid-connect/token";
 
-    /**
-     * Check if user has specific role
-     */
-    public function hasRole(Request $request, string $role)
-    {
-        try {
-            $token = Auth::decodedToken();
-            $realmRoles = $token['realm_access']['roles'] ?? [];
-            $hasRole = in_array($role, $realmRoles);
-            
-            return response()->json([
-                'has_role' => $hasRole,
-                'role' => $role
-            ]);
-        } catch (Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 401);
-        }
-    }
+            try {
+                $response = Http::withOptions([
+                    'verify' => false,
+                ])
+                ->asForm()  // This ensures x-www-form-urlencoded format
+                ->post($tokenUrl, [
+                    'grant_type' => $credentials['grant_type'],
+                    'client_id' => $credentials['client_id'],
+                    'client_secret' => $credentials['client_secret'],
+                    'username' => $credentials['username'],
+                    'password' => $credentials['password']
+                ]);
 
-    /**
-     * Validate token and return its contents
-     */
-    public function validateToken(Request $request)
-    {
-        try {
-            $token = Auth::token();
-            $decodedToken = Auth::decodedToken();
-            
-            return response()->json([
-                'valid' => true,
-                'token' => $token,
-                'decoded' => $decodedToken,
-                'expires_in' => $decodedToken['exp'] - time()
-            ]);
-        } catch (Exception $e) {
-            return response()->json([
-                'valid' => false,
-                'error' => $e->getMessage()
-            ], 401);
-        }
-    }
+                Log::info('Keycloak response', [
+                    'status' => $response->status(),
+                    'body' => $response->json() ?? $response->body()
+                ]);
 
-    /**
-     * Get user permissions from token
-     */
-    public function permissions(Request $request)
-    {
-        try {
-            $token = Auth::decodedToken();
-            $permissions = [];
-            
-            // Extract permissions from resource_access
-            if (isset($token['resource_access'])) {
-                foreach ($token['resource_access'] as $resource => $access) {
-                    if (isset($access['roles'])) {
-                        $permissions[$resource] = $access['roles'];
-                    }
+                if ($response->failed()) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Authentication failed',
+                        'debug' => [
+                            'config' => [
+                                'tokenUrl' => $tokenUrl
+                            ],
+                            'response' => [
+                                'status' => $response->status(),
+                                'body' => $response->json() ?? $response->body()
+                            ]
+                        ]
+                    ], $response->status());
                 }
-            }
-            
-            return response()->json([
-                'permissions' => $permissions
-            ]);
-        } catch (Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 401);
-        }
-    }
 
-    /**
-     * Get token metadata
-     */
-    public function tokenInfo(Request $request)
-    {
-        try {
-            $token = Auth::decodedToken();
-            
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Login successful',
+                    'data' => $response->json()
+                ]);
+
+            } catch (\Exception $e) {
+                Log::error('HTTP request failed', [
+                    'error' => $e->getMessage(),
+                    'url' => $tokenUrl
+                ]);
+
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Connection to authentication server failed',
+                    'debug' => [
+                        'error' => $e->getMessage()
+                    ]
+                ], 500);
+            }
+
+        } catch (\Exception $e) {
             return response()->json([
-                'issued_at' => date('Y-m-d H:i:s', $token['iat']),
-                'expires_at' => date('Y-m-d H:i:s', $token['exp']),
-                'issuer' => $token['iss'] ?? null,
-                'audience' => $token['aud'] ?? null,
-                'subject' => $token['sub'] ?? null,
-                'type' => $token['typ'] ?? null,
-            ]);
-        } catch (Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 401);
+                'status' => 'error',
+                'message' => 'Authentication request failed',
+                'debug' => [
+                    'error' => $e->getMessage()
+                ]
+            ], 500);
         }
     }
 }
